@@ -7,20 +7,33 @@ import subprocess
 import tempfile
 import time
 import uuid
+from itertools import islice, repeat
 from pathlib import Path
 
-from app.services.json_utils import parse_json_object
-from app.services.llm_client import call_llm
+from app.settings import SETTINGS
+from app.services.llm_client import call_json_llm
+from app.services.question_history import unique_questions
 
 
-async def generate_coding_problem(resume: dict, jd: dict, difficulty: str = "junior", language: str = "cpp") -> dict:
+async def generate_coding_problems(
+    resume: dict,
+    jd: dict,
+    count: int,
+    difficulty: str = "junior",
+    language: str = "cpp",
+    avoid_questions: list[str] | None = None,
+) -> list[dict]:
     system = "You generate concise interview coding problems. Return only valid JSON."
+    fallback = fallback_coding_problem()
+    avoid_block = "\n".join(f"- {item}" for item in (avoid_questions or [])[-30:]) or "- None"
     prompt = f"""
-Create one LeetCode-style coding problem for a {difficulty} candidate.
+Create exactly {count} distinct LeetCode-style coding problems for a {difficulty} candidate.
 Target language: {language}.
-The candidate must submit a COMPLETE C++17 program that reads from stdin and writes to stdout.
+Each candidate submission must be a COMPLETE C++17 program that reads from stdin and writes to stdout.
 
 Use the resume and job description context when useful.
+Do not repeat, paraphrase, or lightly modify any already asked/mastered coding problem.
+Prefer topic diversity across arrays, strings, hash maps, trees/graphs, dynamic programming, greedy, API parsing, and edge-case reasoning when appropriate.
 
 RESUME_JSON:
 {json.dumps(resume)}
@@ -28,7 +41,10 @@ RESUME_JSON:
 JD_JSON:
 {json.dumps(jd)}
 
-Return JSON with:
+Already asked or mastered problems to avoid:
+{avoid_block}
+
+Return a JSON array. Each item must contain:
 {{
   "id": "string",
   "category": "dsa",
@@ -41,21 +57,30 @@ Return JSON with:
   "starter_code": "complete C++17 program with TODO comments"
 }}
 """
-    fallback = {
+    data = await call_json_llm(system, prompt, [])
+    rows = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
+    normalized = list(map(lambda problem: normalize_coding_problem(problem, fallback), rows))
+    unique = unique_questions(normalized, avoid_questions or [])
+    placeholders = list(islice(repeat(fallback), max(count - len(unique), 0)))
+    return (unique + placeholders)[:count]
+
+
+def fallback_coding_problem() -> dict:
+    return {
         "id": str(uuid.uuid4()),
         "category": "dsa",
-        "title": "Two Sum Variant",
-        "text": "Read n, then n integers, then target. Print two zero-based indices whose values sum to target, or -1 -1 if no pair exists.",
-        "constraints": ["2 <= n <= 100000", "Input values fit in signed 32-bit integers."],
-        "examples": [{"input": "4\n2 7 11 15\n9", "output": "0 1", "explanation": "2 + 7 = 9"}],
-        "sample_tests": [
-            {"stdin": "4\n2 7 11 15\n9\n", "expected_stdout": "0 1"},
-            {"stdin": "5\n1 4 6 8 10\n14\n", "expected_stdout": "2 3"},
-        ],
-        "expected_points": ["hash map", "O(n) time", "edge cases"],
-        "starter_code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n\n    int n;\n    cin >> n;\n    vector<int> nums(n);\n    for (int i = 0; i < n; i++) cin >> nums[i];\n    int target;\n    cin >> target;\n\n    // TODO: implement an O(n) hash-map solution.\n    cout << -1 << \" \" << -1 << \"\\n\";\n    return 0;\n}\n",
+        "title": "Coding problem unavailable",
+        "text": SETTINGS.fallback_question_text,
+        "constraints": [],
+        "examples": [],
+        "sample_tests": [],
+        "expected_points": [],
+        "starter_code": "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // Generated coding prompt unavailable. Restart the interview after checking LLM configuration.\n    return 0;\n}\n",
     }
-    data = parse_json_object(await call_llm(system, prompt), fallback)
+
+
+def normalize_coding_problem(data: dict, fallback: dict) -> dict:
+    data = data if isinstance(data, dict) else fallback.copy()
     data.setdefault("id", str(uuid.uuid4()))
     data.setdefault("category", "dsa")
     data.setdefault("examples", fallback["examples"])
@@ -115,7 +140,7 @@ Evaluation rules:
         "complexity_questions": [],
         "concise_feedback": "Code evaluation could not be completed.",
     }
-    result = parse_json_object(await call_llm(system, prompt), fallback)
+    result = await call_json_llm(system, prompt, fallback)
     result["code"] = code
     return result
 

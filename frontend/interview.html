@@ -56,6 +56,7 @@
                     <button id="play-btn" disabled>Play Question</button>
                     <button id="record-btn" class="success" disabled>Record</button>
                     <button id="submit-text-btn" disabled>Submit Text</button>
+                    <button id="end-btn" class="danger" disabled>End Interview</button>
                 </div>
                 <div id="status" class="status"></div>
             </div>
@@ -84,6 +85,7 @@
         const playBtn = document.getElementById("play-btn");
         const recordBtn = document.getElementById("record-btn");
         const submitTextBtn = document.getElementById("submit-text-btn");
+        const endBtn = document.getElementById("end-btn");
         const statusEl = document.getElementById("status");
         const evalEl = document.getElementById("eval");
         const questionTitle = document.getElementById("question-title");
@@ -164,6 +166,7 @@
 
             recordBtn.disabled = false;
             submitTextBtn.disabled = false;
+            endBtn.disabled = false;
             textAnswer.value = "";
             evalEl.innerHTML = "";
         }
@@ -180,6 +183,7 @@
                 recordBtn.disabled = true;
                 submitTextBtn.disabled = true;
                 playBtn.disabled = true;
+                endBtn.disabled = true;
                 setStatus("Completed.");
                 return;
             }
@@ -236,6 +240,7 @@
                 setStatus("Finished. Open the report.");
                 recordBtn.disabled = true;
                 submitTextBtn.disabled = true;
+                endBtn.disabled = true;
                 return;
             }
 
@@ -259,7 +264,36 @@
                 return;
             }
             localStorage.setItem("mi_ats", JSON.stringify(data.ats_score || {}));
+            endBtn.disabled = false;
             await fetchQuestion();
+        });
+
+        endBtn.addEventListener("click", async () => {
+            if (!sessionId) {
+                setStatus("Upload documents first.");
+                return;
+            }
+            const confirmed = window.confirm("End the interview now and generate a progress report?");
+            if (!confirmed) return;
+
+            const form = new FormData();
+            form.append("session_id", sessionId);
+            endBtn.disabled = true;
+            recordBtn.disabled = true;
+            submitTextBtn.disabled = true;
+            playBtn.disabled = true;
+            setStatus("Ending interview and generating report...");
+
+            const res = await fetch("/api/end-interview", { method: "POST", body: form });
+            const data = await res.json();
+            if (data.report) {
+                localStorage.setItem("mi_latest_report", JSON.stringify(data.report));
+                setStatus("Progress report ready.");
+                window.location.href = "report.html";
+            } else {
+                setStatus("Error: " + JSON.stringify(data));
+                endBtn.disabled = false;
+            }
         });
 
         playBtn.addEventListener("click", () => ttsAudio.play());

@@ -30,7 +30,12 @@
             <div class="panel span-4">
                 <h2>Actions</h2>
                 <button id="load-report" class="primary">Generate Report</button>
+                <button id="download-pdf" type="button" disabled>Download PDF</button>
                 <div id="status" class="status"></div>
+            </div>
+            <div class="panel span-12">
+                <h2>Progress</h2>
+                <div id="progress-summary" class="grid"></div>
             </div>
 
             <div class="panel span-12">
@@ -66,6 +71,8 @@
     <script>
         const sessionId = localStorage.getItem("mi_session_id");
         const statusEl = document.getElementById("status");
+        const downloadPdfBtn = document.getElementById("download-pdf");
+        let latestReport = null;
 
         function list(id, items, renderer = item => item) {
             const el = document.getElementById(id);
@@ -78,10 +85,16 @@
         }
 
         function render(report) {
+            latestReport = report;
+            localStorage.setItem("mi_latest_report", JSON.stringify(report));
+            downloadPdfBtn.disabled = false;
+            document.body.classList.add("report-ready");
+
             document.getElementById("overall-score").textContent =
                 report.overall_score !== undefined ? Math.round(report.overall_score * 100) + "%" : "NA";
             document.getElementById("ats-score").textContent =
                 report.ats?.score !== undefined ? report.ats.score + "/100" : "NA";
+            renderProgress(report);
 
             list("good-points", report.good_points);
             list("weak-points", report.weak_points);
@@ -108,6 +121,18 @@
                 `;
                 qRoot.appendChild(div);
             });
+        }
+
+        function renderProgress(report) {
+            const progress = report.progress || {};
+            const root = document.getElementById("progress-summary");
+            root.innerHTML = `
+                <div class="panel span-3"><div class="score">${report.status || "NA"}</div><p class="muted">Status</p></div>
+                <div class="panel span-3"><div class="score">${progress.answered_main_questions || 0}/${progress.total_main_questions || 0}</div><p class="muted">Main questions answered</p></div>
+                <div class="panel span-3"><div class="score">${progress.answered_items || 0}</div><p class="muted">Total answer items</p></div>
+                <div class="panel span-3"><div class="score">${progress.remaining_main_questions || 0}</div><p class="muted">Remaining</p></div>
+                ${report.ended_reason ? `<div class="panel span-12"><p><strong>End reason:</strong> ${report.ended_reason}</p><p class="muted">${report.ended_at || ""}</p></div>` : ""}
+            `;
         }
 
         function renderCodingSummary(summary) {
@@ -157,6 +182,21 @@
                 statusEl.textContent = "Error: " + JSON.stringify(data);
             }
         });
+
+        downloadPdfBtn.addEventListener("click", () => {
+            if (!latestReport) {
+                statusEl.textContent = "Generate or load a report first.";
+                return;
+            }
+            document.title = `mock-interview-report-${latestReport.session_id || "session"}`;
+            window.print();
+        });
+
+        const cachedReport = localStorage.getItem("mi_latest_report");
+        if (cachedReport) {
+            render(JSON.parse(cachedReport));
+            statusEl.textContent = "Loaded latest report.";
+        }
     </script>
 </body>
 </html>

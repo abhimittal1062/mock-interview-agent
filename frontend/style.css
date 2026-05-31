@@ -88,6 +88,13 @@ button.warning {
     color: #171006;
 }
 
+.btn.danger,
+button.danger {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff;
+}
+
 button:disabled,
 .btn.disabled {
     opacity: 0.45;
@@ -109,6 +116,10 @@ button:disabled,
 
 .span-4 {
     grid-column: span 4;
+}
+
+.span-3 {
+    grid-column: span 3;
 }
 
 .span-5 {
@@ -252,6 +263,7 @@ pre {
 
 @media (max-width: 820px) {
     .span-4,
+    .span-3,
     .span-5,
     .span-6,
     .span-7,
@@ -263,5 +275,53 @@ pre {
     .topbar {
         align-items: flex-start;
         flex-direction: column;
+    }
+}
+
+@media print {
+    :root {
+        --bg: #ffffff;
+        --surface: #ffffff;
+        --surface-2: #ffffff;
+        --line: #d1d5db;
+        --text: #111827;
+        --muted: #4b5563;
+    }
+
+    body {
+        background: #ffffff;
+        color: #111827;
+    }
+
+    .shell {
+        width: 100%;
+        padding: 0;
+    }
+
+    .topbar .nav,
+    #load-report,
+    #download-pdf,
+    #status {
+        display: none !important;
+    }
+
+    .grid {
+        display: block;
+    }
+
+    .panel {
+        break-inside: avoid;
+        box-shadow: none;
+        margin-bottom: 14px;
+    }
+
+    a {
+        color: #111827;
+        text-decoration: none;
+    }
+
+    pre {
+        white-space: pre-wrap;
+        border-color: #d1d5db;
     }
 }

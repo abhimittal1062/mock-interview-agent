@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from statistics import mean
 
+from app.settings import SETTINGS
+
 
 def _score(answer: dict) -> float:
     evaluation = answer.get("evaluation") or {}
@@ -15,6 +17,9 @@ def _score(answer: dict) -> float:
 def build_final_report(session: dict) -> dict:
     answers = session.get("answers", [])
     code_runs = session.get("code_runs", [])
+    total_questions = len(session.get("questions", []))
+    answered_main_questions = len({answer.get("question_id") for answer in answers if not answer.get("is_followup")})
+    remaining_questions = max(total_questions - int(session.get("current", 0)), 0)
     scores = [_score(answer) for answer in answers]
     avg_score = round(mean(scores), 4) if scores else 0.0
 
@@ -66,6 +71,16 @@ def build_final_report(session: dict) -> dict:
 
     report = {
         "session_id": session.get("session_id"),
+        "status": session.get("status", "unknown"),
+        "ended_reason": session.get("ended_reason"),
+        "ended_at": session.get("ended_at"),
+        "progress": {
+            "answered_items": len(answers),
+            "answered_main_questions": answered_main_questions,
+            "total_main_questions": total_questions,
+            "remaining_main_questions": remaining_questions,
+            "followup_count_current_question": session.get("followup_count", 0),
+        },
         "interview_config": session.get("config", {}),
         "overall_score": avg_score,
         "ats": session.get("ats_score"),
@@ -75,7 +90,7 @@ def build_final_report(session: dict) -> dict:
         "missing_keywords": missing_unique,
         "resources": resources,
         "questions": question_reports,
-        "recording_policy": "Recordings are downloaded by the browser for the user. Backend audio is temporary and deleted after transcription.",
+        "recording_policy": SETTINGS.recording_policy,
     }
     session["final_report"] = report
     return report
@@ -119,11 +134,11 @@ def _suggest_resources(session: dict, weak_points: list[str], missing_keywords: 
     config = session.get("config", {})
     interview_type = config.get("interview_type", "mixed")
     resources = [
-        {"title": "STAR method practice", "url": "https://www.themuse.com/advice/star-interview-method"},
-        {"title": "System design primer", "url": "https://github.com/donnemartin/system-design-primer"},
+        SETTINGS.resource_links["star"],
+        SETTINGS.resource_links["system_design"],
     ]
     if interview_type in {"dsa", "mixed"} or any("complexity" in item.lower() for item in weak_points):
-        resources.append({"title": "NeetCode practice roadmap", "url": "https://neetcode.io/roadmap"})
+        resources.append(SETTINGS.resource_links["dsa"])
     if missing_keywords:
-        resources.append({"title": "Resume keyword alignment guide", "url": "https://www.indeed.com/career-advice/resumes-cover-letters/resume-keywords"})
+        resources.append(SETTINGS.resource_links["resume_keywords"])
     return resources[:6]

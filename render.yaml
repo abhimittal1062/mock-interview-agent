@@ -9,5 +9,13 @@ services:
         sync: false
       - key: WHISPER_MODEL
         value: base
+      - key: LLM_TEMPERATURE
+        value: "0.85"
+      - key: LLM_TOP_P
+        value: "0.92"
+      - key: FOLLOWUP_SCORE_THRESHOLD
+        value: "0.55"
+      - key: MAX_FOLLOWUPS_PER_QUESTION
+        value: "3"
       - key: CXX_COMPILER
         value: g++

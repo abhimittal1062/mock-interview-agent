@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Form
 from urllib.parse import quote
+
+from fastapi import APIRouter, Form
+
+from app.settings import SETTINGS
 from app.services.session_manager import SESSIONS
 
 router = APIRouter()
@@ -7,23 +10,14 @@ router = APIRouter()
 
 @router.post("/get-question")
 async def get_question(session_id: str = Form(...)):
-    """
-    Returns:
-        - Pending follow-up (with audio_url)
-        - Next main question (with audio_url)
-        - Done message
-    """
-
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "Invalid session_id"}
+    if session.get("status") == "ended":
+        return {"type": "done", "message": "Interview ended by candidate."}
 
-    # ---------------------- 1️⃣ FOLLOW-UP QUESTION HANDLING ----------------------
     followup_text = session.get("followup_pending")
     if followup_text:
-        encoded_text = quote(followup_text)
-        audio_url = f"/api/question-audio?text={encoded_text}"
-
         return {
             "type": "followup",
             "followup_count": session.get("followup_count", 0),
@@ -31,36 +25,29 @@ async def get_question(session_id: str = Form(...)):
                 "id": f"followup_{session['followup_count']}",
                 "category": "followup",
                 "text": followup_text,
-                "audio_url": audio_url,
+                "audio_url": _question_audio_url(followup_text),
             },
         }
 
-    # ---------------------- 2️⃣ MAIN QUESTION HANDLING ----------------------
     current_index = session.get("current", 0)
     questions = session.get("questions", [])
-
-    # No more questions → interview done
     if current_index >= len(questions):
-        return {
-            "type": "done",
-            "message": "Interview completed. No more questions."
-        }
+        session["status"] = "completed"
+        return {"type": "done", "message": "Interview completed. No more questions."}
 
-    # Safe extraction
-    q = questions[current_index]
-    q_text = q.get("text") or q.get("title") or "No question text provided (fallback)."
-
-    encoded_text = quote(q_text)
-    audio_url = f"/api/question-audio?text={encoded_text}"
-
-    # Attach audio_url to the question
+    question = questions[current_index]
+    question_text = question.get("text") or question.get("title") or SETTINGS.fallback_question_text
     return {
         "type": "main",
         "index": current_index,
         "remaining": len(questions) - current_index - 1,
         "question": {
-            **q,
-            "text": q_text,   # ensure existence
-            "audio_url": audio_url,
+            **question,
+            "text": question_text,
+            "audio_url": _question_audio_url(question_text),
         },
     }
+
+
+def _question_audio_url(text: str) -> str:
+    return f"/api/question-audio?text={quote(text)}"

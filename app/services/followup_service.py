@@ -1,7 +1,6 @@
 # app/services/followup_service.py
 
-from app.services.llm_client import call_llm
-import json
+from app.services.llm_client import call_json_llm
 
 
 async def generate_followup(question_text: str, user_answer: str):
@@ -33,14 +32,5 @@ Return JSON:
 }}
 """
 
-    response = await call_llm(system, prompt)
-
-    # Try to parse JSON safely
-    try:
-        data = json.loads(response)
-        followup = data.get("followup")
-    except Exception:
-        # fallback: return the raw text as a follow-up
-        followup = response.strip()
-
-    return {"followup": followup}
+    data = await call_json_llm(system, prompt, {"followup": None})
+    return {"followup": data.get("followup")}

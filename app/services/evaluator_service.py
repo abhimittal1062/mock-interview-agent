@@ -1,10 +1,9 @@
-import json
 from app.services.evaluator_model import (
     generate_ideal_answer,
     compute_semantic_similarity,
     compute_bert_f1
 )
-from app.services.llm_client import call_llm
+from app.services.llm_client import call_json_llm
 
 
 async def evaluate_answer(question_text: str, user_answer: str):
@@ -45,18 +44,16 @@ Return a JSON object with exactly these keys:
 - concise_feedback: a short paragraph (2–3 sentences)
 """
 
-    llm_raw = await call_llm(system_msg, user_prompt)
-
-
-    try:
-        qualitative = json.loads(llm_raw)
-    except Exception:
-        qualitative = {
+    qualitative = await call_json_llm(
+        system_msg,
+        user_prompt,
+        {
             "strengths": [],
             "weaknesses": ["Evaluation failed. Model returned invalid JSON."],
             "missing_keywords": [],
-            "concise_feedback": llm_raw[:200]  
-        }
+            "concise_feedback": "Evaluation failed. Model returned invalid JSON.",
+        },
+    )
 
 
     evaluation = {
