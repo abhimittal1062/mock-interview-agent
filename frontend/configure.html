@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Configure Interview</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg">
+    <main class="shell">
+        <header class="topbar">
+            <div class="brand">Configure Interview</div>
+            <nav class="nav">
+                <a href="upload.html">Upload</a>
+                <a href="interview.html">Interview</a>
+            </nav>
+        </header>
+
+        <section class="grid">
+            <form class="panel span-7">
+                <h1>Interview setup</h1>
+                <div class="field">
+                    <label for="interview-type">Type</label>
+                    <select id="interview-type">
+                        <option value="mixed">Mixed</option>
+                        <option value="hr">HR / behavioral</option>
+                        <option value="technical">Technical resume-based</option>
+                        <option value="system_design">System design</option>
+                        <option value="dsa">DSA / coding</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="difficulty">Difficulty</label>
+                    <select id="difficulty">
+                        <option value="intern">Intern</option>
+                        <option value="junior" selected>Junior</option>
+                        <option value="mid">Mid-level</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="question-count">Questions</label>
+                    <input id="question-count" type="number" min="1" max="12" value="5" />
+                </div>
+                <div class="field">
+                    <label for="language">Coding language</label>
+                    <select id="language">
+                        <option value="cpp">C++</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="answer-mode">Answer mode</label>
+                    <select id="answer-mode">
+                        <option value="voice">Voice</option>
+                        <option value="text">Text</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <button type="button" id="save-btn" class="primary">Save</button>
+                    <a class="btn" href="upload.html">Back</a>
+                </div>
+                <div id="status" class="status"></div>
+            </form>
+
+            <aside class="panel span-5">
+                <h2>Current session</h2>
+                <pre id="session-box">None</pre>
+            </aside>
+        </section>
+    </main>
+
+    <script>
+        const sessionId = localStorage.getItem("mi_session_id");
+        document.getElementById("session-box").textContent = sessionId || "None";
+
+        const savedConfig = JSON.parse(localStorage.getItem("mi_config") || "{}");
+        for (const [key, value] of Object.entries({
+            "interview-type": savedConfig.interview_type,
+            "difficulty": savedConfig.difficulty,
+            "question-count": savedConfig.question_count,
+            "language": savedConfig.language,
+            "answer-mode": savedConfig.answer_mode
+        })) {
+            if (value && document.getElementById(key)) {
+                document.getElementById(key).value = value;
+            }
+        }
+
+        document.getElementById("save-btn").addEventListener("click", async () => {
+            const status = document.getElementById("status");
+            if (!sessionId) {
+                status.textContent = "Upload documents first.";
+                return;
+            }
+
+            const config = {
+                interview_type: document.getElementById("interview-type").value,
+                difficulty: document.getElementById("difficulty").value,
+                question_count: document.getElementById("question-count").value,
+                language: document.getElementById("language").value,
+                answer_mode: document.getElementById("answer-mode").value
+            };
+
+            const form = new FormData();
+            form.append("session_id", sessionId);
+            Object.entries(config).forEach(([key, value]) => form.append(key, value));
+
+            status.textContent = "Saving...";
+            const res = await fetch("/api/configure-interview", { method: "POST", body: form });
+            const data = await res.json();
+            if (data.config) {
+                localStorage.setItem("mi_config", JSON.stringify(data.config));
+                status.textContent = "Saved.";
+                window.location.href = "interview.html";
+            } else {
+                status.textContent = "Error: " + JSON.stringify(data);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -3,39 +3,40 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mock Interview – Home</title>
+    <title>Mock Interview Agent</title>
     <link rel="stylesheet" href="style.css" />
 </head>
-
 <body class="bg">
-    <main class="center-card">
-        <section class="glass card-large">
-            <h1 class="brand">Mock Interview Agent</h1>
+    <main class="shell">
+        <header class="topbar">
+            <div class="brand">Mock Interview Agent</div>
+            <nav class="nav">
+                <a href="upload.html">Upload</a>
+                <a href="configure.html">Configure</a>
+                <a href="interview.html">Interview</a>
+                <a href="report.html">Report</a>
+            </nav>
+        </header>
 
-            <p class="lead">
-                Upload your resume and job description, then experience a fully automated,
-                voice-driven AI mock interview followed by a personalized improvement plan.
-            </p>
-
-            <div class="btn-row">
-                <a class="btn" href="upload.html">Start (Upload Documents)</a>
-                <a class="btn ghost" href="interview.html">
-                    Interview Mode (Use Existing Session)
-                </a>
+        <section class="grid">
+            <div class="panel span-8">
+                <h1>Adaptive interview preparation</h1>
+                <p class="lead">Practice HR, system design, technical, and DSA interviews using your resume and target job description.</p>
+                <div class="row">
+                    <a class="btn primary" href="upload.html">Start</a>
+                    <a class="btn" href="interview.html">Resume Session</a>
+                </div>
             </div>
-
-            <div class="note">
-                Demo Image loaded from environment:
-            </div>
-
-            <div class="preview">
-                <img src="/mnt/data/6288cdd4-43fc-4c2d-8798-b62d9a27e6f9.png" alt="preview image" />
+            <div class="panel span-4">
+                <h2>Modes</h2>
+                <div class="stack">
+                    <span class="badge">HR</span>
+                    <span class="badge">System design</span>
+                    <span class="badge">DSA with C++ workspace</span>
+                    <span class="badge">Final report + ATS score</span>
+                </div>
             </div>
         </section>
-
-        <footer class="muted">
-            Built with ❤️ — AI Agentic Mock Interview MVP
-        </footer>
     </main>
 </body>
 </html>

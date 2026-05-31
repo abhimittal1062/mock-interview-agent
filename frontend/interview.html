@@ -3,165 +3,354 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mock Interview – Interview Mode</title>
+    <title>Interview</title>
     <link rel="stylesheet" href="style.css" />
 </head>
-
 <body class="bg">
-    <main class="center-card">
-        <section class="glass card-large">
-            <h2>Interview</h2>
+    <main class="shell">
+        <header class="topbar">
+            <div class="brand">Interview</div>
+            <nav class="nav">
+                <a href="upload.html">Upload</a>
+                <a href="configure.html">Configure</a>
+                <a href="report.html">Report</a>
+            </nav>
+        </header>
 
-            <div class="question-area">
-                <div id="question-text" class="question">
-                    Press “Start Interview” to begin.
+        <section class="grid">
+            <div class="panel span-7">
+                <div class="row">
+                    <span id="mode-badge" class="badge">Not started</span>
+                    <span id="progress-badge" class="badge">0 / 0</span>
+                </div>
+                <h1 id="question-title">Ready</h1>
+                <p id="question-text" class="question-text">Start the interview when your configuration is saved.</p>
+                <audio id="tts-audio" controls class="hidden"></audio>
+
+                <div id="problem-panel" class="stack hidden">
+                    <h2 id="problem-title">Coding problem</h2>
+                    <pre id="problem-details"></pre>
+                    <div class="field">
+                        <label for="code-editor">C++ code</label>
+                        <textarea id="code-editor" class="code-editor"></textarea>
+                    </div>
+                    <div class="grid">
+                        <div class="field span-6">
+                            <label for="time-complexity">Time complexity</label>
+                            <input id="time-complexity" placeholder="Example: O(n)" />
+                        </div>
+                        <div class="field span-6">
+                            <label for="space-complexity">Space complexity</label>
+                            <input id="space-complexity" placeholder="Example: O(n)" />
+                        </div>
+                    </div>
+                    <div class="row">
+                        <button id="run-code-btn" class="warning" type="button" disabled>Run Sample Tests</button>
+                        <span id="run-count" class="badge">0 runs</span>
+                    </div>
+                    <div id="run-results"></div>
                 </div>
 
-                <audio id="tts-audio" controls style="display:none"></audio>
+                <div class="row">
+                    <button id="start-btn" class="primary">Start Interview</button>
+                    <button id="play-btn" disabled>Play Question</button>
+                    <button id="record-btn" class="success" disabled>Record</button>
+                    <button id="submit-text-btn" disabled>Submit Text</button>
+                </div>
+                <div id="status" class="status"></div>
             </div>
 
-            <div class="controls">
-                <button id="start-btn" class="btn">Start Interview</button>
-                <button id="play-btn" class="btn ghost" disabled>🔊 Play Again</button>
-                <button id="record-btn" class="btn" disabled>🎤 Record Answer</button>
-            </div>
-
-            <div id="transcript" class="transcript muted"></div>
-            <div id="eval" class="eval"></div>
-
-            <!-- Semantic Confidence Display -->
-            <div id="score" class="score" 
-                 style="margin-top:12px; font-weight:bold; font-size:1.1rem;">
-            </div>
-
-            <div class="btn-row" style="margin-top:20px;">
-                <a class="btn ghost" href="upload.html">Upload Again</a>
-                <a class="btn" href="improvement.html">Get Improvement Plan</a>
-            </div>
+            <aside class="panel span-5">
+                <h2>Answer</h2>
+                <div class="field">
+                    <label for="text-answer">Transcript or typed answer</label>
+                    <textarea id="text-answer" placeholder="Type here or record your voice."></textarea>
+                </div>
+                <div id="eval" class="stack"></div>
+            </aside>
         </section>
-
-        <footer class="muted">
-            Your voice is recorded locally. Nothing leaves your browser except the audio for the interview.
-        </footer>
     </main>
 
     <script>
-        let sessionId = localStorage.getItem("mi_session_id") || null;
+        const sessionId = localStorage.getItem("mi_session_id");
+        const config = JSON.parse(localStorage.getItem("mi_config") || "{}");
+        let currentQuestion = null;
+        let currentType = "main";
         let mediaRecorder = null;
         let audioChunks = [];
+        let recordingFilename = null;
 
         const startBtn = document.getElementById("start-btn");
         const playBtn = document.getElementById("play-btn");
         const recordBtn = document.getElementById("record-btn");
+        const submitTextBtn = document.getElementById("submit-text-btn");
+        const statusEl = document.getElementById("status");
+        const evalEl = document.getElementById("eval");
+        const questionTitle = document.getElementById("question-title");
         const questionText = document.getElementById("question-text");
         const ttsAudio = document.getElementById("tts-audio");
-        const transcriptEl = document.getElementById("transcript");
-        const evalEl = document.getElementById("eval");
-        const scoreEl = document.getElementById("score");
+        const problemPanel = document.getElementById("problem-panel");
+        const problemTitle = document.getElementById("problem-title");
+        const problemDetails = document.getElementById("problem-details");
+        const codeEditor = document.getElementById("code-editor");
+        const runCodeBtn = document.getElementById("run-code-btn");
+        const runResults = document.getElementById("run-results");
+        const runCount = document.getElementById("run-count");
+        const timeComplexity = document.getElementById("time-complexity");
+        const spaceComplexity = document.getElementById("space-complexity");
+        const textAnswer = document.getElementById("text-answer");
+        let sampleRunCount = 0;
 
-        async function fetchQuestion() {
-            if (!sessionId) {
-                alert("Missing session ID — upload resume & JD first.");
-                window.location.href = "upload.html";
-                return;
-            }
+        function setStatus(message) {
+            statusEl.textContent = message || "";
+        }
 
-            const form = new FormData();
-            form.append("session_id", sessionId);
+        function makeRecordingName(question, kind) {
+            const shortSession = (sessionId || "session").slice(0, 8);
+            const qid = String(question?.id || "question").replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 32);
+            const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+            return `mock_interview_${shortSession}_${stamp}_${qid}_${kind}.webm`;
+        }
 
-            const res = await fetch("/api/get-question", {
-                method: "POST",
-                body: form,
-            });
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
 
-            const data = await res.json();
+        function renderQuestion(data) {
+            currentType = data.type || "main";
+            currentQuestion = data.question;
+            document.getElementById("mode-badge").textContent = currentType;
+            document.getElementById("progress-badge").textContent =
+                data.index !== undefined ? `${data.index + 1} / ${(data.index + 1) + data.remaining}` : "Follow-up";
 
-            if (data.type === "done") {
-                questionText.innerText = "Interview Completed!";
-                recordBtn.disabled = true;
-                playBtn.disabled = true;
-                return;
-            }
+            questionTitle.textContent = currentQuestion.title || currentQuestion.category || "Question";
+            questionText.textContent = currentQuestion.text || currentQuestion.title || "Question unavailable.";
 
-            const q = data.question;
-            questionText.innerText = q.text || "Placeholder question";
-
-            // Play question TTS
-            if (q.audio_url) {
-                ttsAudio.src = q.audio_url;
-                ttsAudio.style.display = "block";
-                ttsAudio.play().catch(() => {});
+            if (currentQuestion.audio_url) {
+                ttsAudio.src = currentQuestion.audio_url;
+                ttsAudio.classList.remove("hidden");
                 playBtn.disabled = false;
+                ttsAudio.play().catch(() => {});
+            } else {
+                ttsAudio.classList.add("hidden");
+                playBtn.disabled = true;
+            }
+
+            const isCoding = currentQuestion.category === "dsa" || currentQuestion.starter_code;
+            problemPanel.classList.toggle("hidden", !isCoding);
+            if (isCoding) {
+                problemTitle.textContent = currentQuestion.title || "Coding problem";
+                problemDetails.textContent = [
+                    currentQuestion.text || "",
+                    currentQuestion.constraints?.length ? "\nConstraints:\n- " + currentQuestion.constraints.join("\n- ") : "",
+                    currentQuestion.examples?.length ? "\nExamples:\n" + currentQuestion.examples.map(ex => `Input: ${ex.input}\nOutput: ${ex.output}\n${ex.explanation || ""}`).join("\n\n") : "",
+                    currentQuestion.sample_tests?.length ? "\nExecutable sample tests:\n" + currentQuestion.sample_tests.map((test, index) => `#${index + 1}\nstdin:\n${test.stdin}\nexpected stdout:\n${test.expected_stdout}`).join("\n\n") : ""
+                ].join("\n");
+                codeEditor.value = currentQuestion.starter_code || codeEditor.value;
+                runCodeBtn.disabled = false;
+                runResults.innerHTML = "";
+                sampleRunCount = 0;
+                runCount.textContent = "0 runs";
+                timeComplexity.value = "";
+                spaceComplexity.value = "";
             }
 
             recordBtn.disabled = false;
-            transcriptEl.innerText = "";
-            evalEl.innerText = "";
-            scoreEl.innerText = "";
+            submitTextBtn.disabled = false;
+            textAnswer.value = "";
+            evalEl.innerHTML = "";
         }
 
-        // Start interview — generate questions
-        startBtn.addEventListener("click", async () => {
+        async function fetchQuestion() {
             const form = new FormData();
             form.append("session_id", sessionId);
-            form.append("question_count", 5);
+            const res = await fetch("/api/get-question", { method: "POST", body: form });
+            const data = await res.json();
 
-            await fetch("/api/start-interview", { method: "POST", body: form });
+            if (data.type === "done") {
+                questionTitle.textContent = "Interview completed";
+                questionText.textContent = "Open the report when you are ready.";
+                recordBtn.disabled = true;
+                submitTextBtn.disabled = true;
+                playBtn.disabled = true;
+                setStatus("Completed.");
+                return;
+            }
 
-            fetchQuestion();
+            if (data.error) {
+                setStatus(data.error);
+                return;
+            }
+
+            renderQuestion(data);
+            setStatus("");
+        }
+
+        function renderEvaluation(data) {
+            const evaluation = data.evaluation || {};
+            const codeEval = evaluation.code_evaluation || {};
+            const score = evaluation.combined_score ?? codeEval.code_score;
+            evalEl.innerHTML = `
+                <div class="panel">
+                    <div class="score">${score !== undefined ? Math.round(score * 100) + "%" : "NA"}</div>
+                    <p>${evaluation.concise_feedback || codeEval.concise_feedback || "Feedback unavailable."}</p>
+                    ${recordingFilename ? `<p class="muted">Recording: ${recordingFilename}</p>` : ""}
+                    ${codeEval.complexity ? `<p class="muted">Complexity: ${codeEval.complexity}</p>` : ""}
+                </div>
+            `;
+        }
+
+        async function submitAnswer(transcript, audioBlob) {
+            const form = new FormData();
+            form.append("session_id", sessionId);
+            form.append("audio_filename", recordingFilename || "");
+            const code = codeEditor.value.trim();
+            if (code) form.append("code_submission", code);
+            const complexity = [
+                timeComplexity.value.trim() ? `Time: ${timeComplexity.value.trim()}` : "",
+                spaceComplexity.value.trim() ? `Space: ${spaceComplexity.value.trim()}` : ""
+            ].filter(Boolean).join("; ");
+            if (complexity) form.append("complexity_claim", complexity);
+
+            let endpoint = "/api/submit-answer";
+            if (audioBlob) {
+                endpoint = "/api/submit-answer-audio";
+                form.append("file", audioBlob, recordingFilename);
+            } else {
+                form.append("transcript", transcript);
+            }
+
+            setStatus("Evaluating...");
+            const res = await fetch(endpoint, { method: "POST", body: form });
+            const data = await res.json();
+            renderEvaluation(data);
+
+            if (data.type === "finished") {
+                setStatus("Finished. Open the report.");
+                recordBtn.disabled = true;
+                submitTextBtn.disabled = true;
+                return;
+            }
+
+            setStatus(data.type === "followup" ? "Follow-up generated." : "Next question ready.");
+            setTimeout(fetchQuestion, 700);
+        }
+
+        startBtn.addEventListener("click", async () => {
+            if (!sessionId) {
+                setStatus("Upload documents first.");
+                return;
+            }
+            const form = new FormData();
+            form.append("session_id", sessionId);
+            form.append("question_count", config.question_count || 5);
+            setStatus("Starting...");
+            const res = await fetch("/api/start-interview", { method: "POST", body: form });
+            const data = await res.json();
+            if (data.error) {
+                setStatus(data.error);
+                return;
+            }
+            localStorage.setItem("mi_ats", JSON.stringify(data.ats_score || {}));
+            await fetchQuestion();
         });
 
         playBtn.addEventListener("click", () => ttsAudio.play());
 
-        // Recording logic
+        runCodeBtn.addEventListener("click", async () => {
+            if (!currentQuestion) return;
+            const code = codeEditor.value.trim();
+            if (!code) {
+                setStatus("Write code before running samples.");
+                return;
+            }
+
+            const form = new FormData();
+            form.append("session_id", sessionId);
+            form.append("code", code);
+            form.append("time_complexity", timeComplexity.value.trim());
+            form.append("space_complexity", spaceComplexity.value.trim());
+
+            runCodeBtn.disabled = true;
+            setStatus("Running sample tests...");
+            try {
+                const res = await fetch("/api/run-code-samples", { method: "POST", body: form });
+                const data = await res.json();
+                if (data.error) {
+                    runResults.innerHTML = `<pre>${data.error}</pre>`;
+                    setStatus(data.error);
+                    return;
+                }
+                sampleRunCount += 1;
+                runCount.textContent = `${sampleRunCount} run${sampleRunCount === 1 ? "" : "s"}`;
+                renderRunResult(data.run);
+                setStatus(data.run.result.message || data.run.result.status);
+            } catch (err) {
+                runResults.innerHTML = `<pre>${err.message}</pre>`;
+                setStatus("Run failed.");
+            } finally {
+                runCodeBtn.disabled = false;
+            }
+        });
+
+        function renderRunResult(run) {
+            const result = run.result || {};
+            const tests = result.tests || [];
+            runResults.innerHTML = `
+                <div class="panel">
+                    <h3>${result.ok ? "Samples passed" : "Samples not passed"}</h3>
+                    <p>${result.message || result.status || ""}</p>
+                    <p class="muted">Elapsed: ${result.elapsed_ms || 0} ms</p>
+                    ${result.compiler_stderr ? `<pre>${result.compiler_stderr}</pre>` : ""}
+                    ${tests.map(test => `
+                        <div class="report-question">
+                            <strong>Sample ${test.index}: ${test.ok ? "Passed" : "Failed"}</strong>
+                            <pre>stdin:\n${test.stdin}\n\nexpected:\n${test.expected_stdout}\n\nactual:\n${test.actual_stdout}${test.stderr ? "\n\nstderr:\n" + test.stderr : ""}</pre>
+                        </div>
+                    `).join("")}
+                </div>
+            `;
+        }
+
         recordBtn.addEventListener("click", async () => {
+            if (!currentQuestion) return;
+
             if (!mediaRecorder) {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-                mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
-
-                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-
+                recordingFilename = makeRecordingName(currentQuestion, currentType);
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
                 mediaRecorder.onstop = async () => {
                     const blob = new Blob(audioChunks, { type: "audio/webm" });
-                    const form = new FormData();
-                    form.append("session_id", sessionId);
-                    form.append("file", blob, "answer.webm");
-
-                    const res = await fetch("/api/submit-answer-audio", {
-                        method: "POST",
-                        body: form,
-                    });
-
-                    const data = await res.json();
-
-                    transcriptEl.innerText =
-                        "Transcript: " + (data.evaluation?.transcript || "No transcript");
-
-                    evalEl.innerText =
-                        data.evaluation?.concise_feedback ||
-                        "Evaluation unavailable.";
-
-                    // Show semantic similarity score
-                    if (data.evaluation?.semantic_similarity !== undefined) {
-                        const percent =
-                            Math.round(data.evaluation.semantic_similarity * 100);
-                        scoreEl.innerText = `Semantic Match Confidence: ${percent}%`;
-                    } else {
-                        scoreEl.innerText = "Confidence unavailable.";
-                    }
-
-                    fetchQuestion();
+                    downloadBlob(blob, recordingFilename);
+                    recordBtn.textContent = "Record";
+                    mediaRecorder = null;
+                    await submitAnswer("", blob);
                 };
-
                 mediaRecorder.start();
-                recordBtn.innerText = "⏹ Stop Recording";
+                recordBtn.textContent = "Stop";
+                setStatus("Recording...");
             } else {
                 mediaRecorder.stop();
-                mediaRecorder = null;
-                recordBtn.innerText = "🎤 Record Answer";
             }
+        });
+
+        submitTextBtn.addEventListener("click", async () => {
+            const transcript = textAnswer.value.trim();
+            if (!transcript) {
+                setStatus("Type an answer first.");
+                return;
+            }
+            recordingFilename = null;
+            await submitAnswer(transcript, null);
         });
     </script>
 </body>

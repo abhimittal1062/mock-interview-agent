@@ -48,7 +48,7 @@ async def get_question(session_id: str = Form(...)):
 
     # Safe extraction
     q = questions[current_index]
-    q_text = q.get("text", "No question text provided (fallback).")
+    q_text = q.get("text") or q.get("title") or "No question text provided (fallback)."
 
     encoded_text = quote(q_text)
     audio_url = f"/api/question-audio?text={encoded_text}"

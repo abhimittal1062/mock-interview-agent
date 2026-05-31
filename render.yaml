@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: mock-interview-agent
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: WHISPER_MODEL
+        value: base
+      - key: CXX_COMPILER
+        value: g++

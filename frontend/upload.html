@@ -3,88 +3,84 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Upload Resume & Job Description</title>
+    <title>Upload Documents</title>
     <link rel="stylesheet" href="style.css" />
 </head>
-
 <body class="bg">
-    <main class="center-card">
-        <section class="glass card">
-            <h2>Upload Resume & Job Description</h2>
-            <p class="lead">
-                Upload both files (PDF / DOCX / TXT). We will parse them and generate
-                interview questions based on your experience and the job role.
-            </p>
+    <main class="shell">
+        <header class="topbar">
+            <div class="brand">Upload Documents</div>
+            <nav class="nav">
+                <a href="index.html">Home</a>
+                <a href="configure.html">Configure</a>
+            </nav>
+        </header>
 
-            <form id="upload-form">
-                <label class="file-label">
-                    Resume
-                    <input type="file" id="resume-file" accept=".pdf,.docx,.txt,.jpg,.png" />
-                </label>
-
-                <label class="file-label">
-                    Job Description
-                    <input type="file" id="jd-file" accept=".pdf,.docx,.txt,.jpg,.png" />
-                </label>
-
-                <div class="btn-row">
-                    <button type="button" id="upload-btn" class="btn">
-                        Upload & Parse
-                    </button>
-                    <a class="btn ghost" href="index.html">Back</a>
+        <section class="grid">
+            <form id="upload-form" class="panel span-7">
+                <h1>Resume and job description</h1>
+                <div class="field">
+                    <label for="resume-file">Resume</label>
+                    <input type="file" id="resume-file" accept=".pdf,.docx,.txt" />
                 </div>
-
-                <div id="status" class="muted"></div>
+                <div class="field">
+                    <label for="jd-file">Job description</label>
+                    <input type="file" id="jd-file" accept=".pdf,.docx,.txt" />
+                </div>
+                <div class="row">
+                    <button type="button" id="upload-btn" class="primary">Upload</button>
+                    <a class="btn" href="index.html">Cancel</a>
+                </div>
+                <div id="status" class="status"></div>
             </form>
-        </section>
 
-        <footer class="muted">
-            Tip: Use a PDF resume for best parsing accuracy.
-        </footer>
+            <aside class="panel span-5">
+                <h2>Session</h2>
+                <p class="muted">Current session ID</p>
+                <pre id="session-box">None</pre>
+            </aside>
+        </section>
     </main>
 
     <script>
         const uploadBtn = document.getElementById("upload-btn");
         const statusEl = document.getElementById("status");
+        const sessionBox = document.getElementById("session-box");
+        sessionBox.textContent = localStorage.getItem("mi_session_id") || "None";
 
         uploadBtn.addEventListener("click", async () => {
             const resumeFile = document.getElementById("resume-file").files[0];
             const jdFile = document.getElementById("jd-file").files[0];
 
             if (!resumeFile || !jdFile) {
-                statusEl.innerText = "⚠ Please upload both resume and job description.";
+                statusEl.textContent = "Upload both files.";
                 return;
             }
 
-            statusEl.innerText = "Uploading and parsing...";
+            uploadBtn.disabled = true;
+            statusEl.textContent = "Parsing documents...";
 
             const form = new FormData();
             form.append("resume", resumeFile);
             form.append("jd", jdFile);
 
             try {
-                const res = await fetch("/api/upload-docs", {
-                    method: "POST",
-                    body: form,
-                });
-
+                const res = await fetch("/api/upload-docs", { method: "POST", body: form });
                 const data = await res.json();
 
                 if (data.session_id) {
-                    statusEl.innerText = "Upload successful. Session ID: " + data.session_id;
-
-                    // Save session_id for the interview flow
                     localStorage.setItem("mi_session_id", data.session_id);
-
-                    // Redirect to interview page
-                    setTimeout(() => {
-                        window.location.href = "interview.html";
-                    }, 800);
-                } else {
-                    statusEl.innerText = "❌ Upload error: " + JSON.stringify(data);
+                    sessionBox.textContent = data.session_id;
+                    statusEl.textContent = "Documents parsed.";
+                    window.location.href = "configure.html";
+                    return;
                 }
+
+                statusEl.textContent = "Upload failed: " + JSON.stringify(data);
             } catch (err) {
-                statusEl.innerText = "❌ Network error: " + err.message;
+                statusEl.textContent = "Network error: " + err.message;
+            } finally {
+                uploadBtn.disabled = false;
             }
         });
     </script>

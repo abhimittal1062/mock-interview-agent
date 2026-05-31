@@ -14,6 +14,9 @@ from app.routes.upload import router as upload_router
 from app.routes.tts import router as tts_router
 from app.routes.stt import router as stt_router
 from app.routes.answer_audio import router as answer_audio_router
+from app.routes.config import router as config_router
+from app.routes.report import router as report_router
+from app.routes.coding import router as coding_router
 
 app = FastAPI(title="Mock Interview MVP")
 
@@ -36,6 +39,9 @@ app.include_router(upload_router,       prefix="/api")
 app.include_router(tts_router,          prefix="/api")
 app.include_router(stt_router,          prefix="/api")
 app.include_router(answer_audio_router, prefix="/api")
+app.include_router(config_router,       prefix="/api")
+app.include_router(report_router,       prefix="/api")
+app.include_router(coding_router,       prefix="/api")
 
 
 @app.get("/api/health")

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interview Report</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body class="bg">
+    <main class="shell">
+        <header class="topbar">
+            <div class="brand">Interview Report</div>
+            <nav class="nav">
+                <a href="upload.html">Upload</a>
+                <a href="interview.html">Interview</a>
+            </nav>
+        </header>
+
+        <section class="grid">
+            <div class="panel span-4">
+                <h2>Overall</h2>
+                <div id="overall-score" class="score">NA</div>
+                <p class="muted">Interview score</p>
+            </div>
+            <div class="panel span-4">
+                <h2>ATS</h2>
+                <div id="ats-score" class="score">NA</div>
+                <p class="muted">Resume to JD match</p>
+            </div>
+            <div class="panel span-4">
+                <h2>Actions</h2>
+                <button id="load-report" class="primary">Generate Report</button>
+                <div id="status" class="status"></div>
+            </div>
+
+            <div class="panel span-12">
+                <h2>Coding sample runs</h2>
+                <div id="coding-summary" class="grid"></div>
+            </div>
+
+            <div class="panel span-6">
+                <h2>Good points</h2>
+                <ul id="good-points" class="list"></ul>
+            </div>
+            <div class="panel span-6">
+                <h2>Weak points</h2>
+                <ul id="weak-points" class="list"></ul>
+            </div>
+
+            <div class="panel span-6">
+                <h2>Resume suggestions</h2>
+                <ul id="resume-suggestions" class="list"></ul>
+            </div>
+            <div class="panel span-6">
+                <h2>Resources</h2>
+                <ul id="resources" class="list"></ul>
+            </div>
+
+            <div class="panel span-12">
+                <h2>Question review</h2>
+                <div id="questions"></div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const sessionId = localStorage.getItem("mi_session_id");
+        const statusEl = document.getElementById("status");
+
+        function list(id, items, renderer = item => item) {
+            const el = document.getElementById(id);
+            el.innerHTML = "";
+            (items || []).forEach(item => {
+                const li = document.createElement("li");
+                li.innerHTML = renderer(item);
+                el.appendChild(li);
+            });
+        }
+
+        function render(report) {
+            document.getElementById("overall-score").textContent =
+                report.overall_score !== undefined ? Math.round(report.overall_score * 100) + "%" : "NA";
+            document.getElementById("ats-score").textContent =
+                report.ats?.score !== undefined ? report.ats.score + "/100" : "NA";
+
+            list("good-points", report.good_points);
+            list("weak-points", report.weak_points);
+            list("resume-suggestions", report.ats?.suggestions);
+            list("resources", report.resources, item => `<a href="${item.url}" target="_blank">${item.title}</a>`);
+            renderCodingSummary(report.coding_summary || {});
+
+            const qRoot = document.getElementById("questions");
+            qRoot.innerHTML = "";
+            (report.questions || []).forEach(q => {
+                const div = document.createElement("div");
+                div.className = "report-question";
+                div.innerHTML = `
+                    <h3>Q${q.number}: ${q.question_text || ""}</h3>
+                    <p class="muted">Audio file: ${q.audio_filename || "No recording"}</p>
+                    <p><strong>Score:</strong> ${q.score !== undefined ? Math.round(q.score * 100) + "%" : "NA"}</p>
+                    <p><strong>Feedback:</strong> ${q.feedback || "NA"}</p>
+                    <p><strong>Claimed complexity:</strong> ${q.complexity_claim || "Not provided"}</p>
+                    <p><strong>Evaluated complexity:</strong> ${q.evaluated_complexity || "Not available"}</p>
+                    <p><strong>Sample runs before submit:</strong> ${q.code_attempts || 0}</p>
+                    ${renderLatestRun(q.latest_code_run)}
+                    <pre>${q.transcript || ""}</pre>
+                    ${q.code_submission ? `<pre>${q.code_submission}</pre>` : ""}
+                `;
+                qRoot.appendChild(div);
+            });
+        }
+
+        function renderCodingSummary(summary) {
+            const root = document.getElementById("coding-summary");
+            root.innerHTML = `
+                <div class="panel span-4"><div class="score">${summary.total_sample_runs || 0}</div><p class="muted">Total sample runs</p></div>
+                <div class="panel span-4"><div class="score">${summary.passed_sample_runs || 0}</div><p class="muted">Passed runs</p></div>
+                <div class="panel span-4"><div class="score">${summary.total_elapsed_ms || 0} ms</div><p class="muted">Total run time</p></div>
+            `;
+            (summary.by_question || []).forEach(item => {
+                const div = document.createElement("div");
+                div.className = "panel span-12";
+                div.innerHTML = `
+                    <strong>${item.question_id}</strong>
+                    <p class="muted">Runs: ${item.runs}, passed runs: ${item.passed_runs}, last status: ${item.last_status || "NA"}</p>
+                    <p>Time: ${item.time_complexity || "Not provided"} | Space: ${item.space_complexity || "Not provided"}</p>
+                `;
+                root.appendChild(div);
+            });
+        }
+
+        function renderLatestRun(run) {
+            if (!run || !run.result) return "";
+            return `
+                <div class="panel">
+                    <strong>Latest sample run: ${run.result.status}</strong>
+                    <p>${run.result.message || ""}</p>
+                    <p class="muted">Elapsed: ${run.result.elapsed_ms || 0} ms</p>
+                </div>
+            `;
+        }
+
+        document.getElementById("load-report").addEventListener("click", async () => {
+            if (!sessionId) {
+                statusEl.textContent = "Upload documents first.";
+                return;
+            }
+            const form = new FormData();
+            form.append("session_id", sessionId);
+            statusEl.textContent = "Generating...";
+            const res = await fetch("/api/final-report", { method: "POST", body: form });
+            const data = await res.json();
+            if (data.report) {
+                render(data.report);
+                statusEl.textContent = "Ready.";
+            } else {
+                statusEl.textContent = "Error: " + JSON.stringify(data);
+            }
+        });
+    </script>
+</body>
+</html>

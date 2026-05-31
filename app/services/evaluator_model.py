@@ -3,8 +3,14 @@ from sentence_transformers import SentenceTransformer, util
 from bert_score import score as bert_score
 from app.services.llm_client import call_llm
 
-# Load embedding model once
-_embedding_model = SentenceTransformer("all-mpnet-base-v2")
+_embedding_model = None
+
+
+def get_embedding_model():
+    global _embedding_model
+    if _embedding_model is None:
+        _embedding_model = SentenceTransformer("all-mpnet-base-v2")
+    return _embedding_model
 
 
 async def generate_ideal_answer(question: str):
@@ -17,8 +23,9 @@ async def generate_ideal_answer(question: str):
 
 def compute_semantic_similarity(user: str, ideal: str) -> float:
     """Semantic similarity via cosine between embeddings."""
-    emb_user = _embedding_model.encode(user, convert_to_tensor=True)
-    emb_ideal = _embedding_model.encode(ideal, convert_to_tensor=True)
+    model = get_embedding_model()
+    emb_user = model.encode(user, convert_to_tensor=True)
+    emb_ideal = model.encode(ideal, convert_to_tensor=True)
     sim = util.cos_sim(emb_user, emb_ideal).item()
     return round(float(sim), 4)
 
