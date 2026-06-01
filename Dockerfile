@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -11,6 +11,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+
+# CPU-only torch, no CUDA/NVIDIA downloads
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.12.0
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
