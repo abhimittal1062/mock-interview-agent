@@ -1,0 +1,5 @@
+id,problem,submission_type,expected_pass,actual_pass
+1,Two Sum,correct,yes,yes
+2,Two Sum,wrong_index_return,no,no
+3,Two Sum,bruteforce_correct,yes,yes
+4,Two Sum,empty_return,no,no

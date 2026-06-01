@@ -1,0 +1,4 @@
+id,resume_profile,jd_role,question,relevance_score
+1,Backend FastAPI Python,Backend Engineer,Explain how your FastAPI project handles API routing and validation.,5
+2,Backend FastAPI Python,Backend Engineer,Describe your experience with frontend animations.,2
+3,System Design APIs,Platform Engineer,How would you design observability for your mock interview platform?,5

@@ -1,0 +1,4 @@
+id,question,answer,human_label,human_score,app_score
+1,Explain your FastAPI project.,I built APIs and connected routes.,weak,0.45,0.52
+2,How did you handle system design tradeoffs?,I discussed caching database indexes latency and monitoring.,good,0.80,0.84
+3,Describe conflict resolution.,I used STAR and explained the situation action result.,good,0.75,0.79

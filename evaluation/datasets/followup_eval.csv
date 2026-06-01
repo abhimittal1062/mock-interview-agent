@@ -1,0 +1,4 @@
+id,question,weak_answer,generated_followup,followup_relevant
+1,Explain caching.,I would use cache.,What cache invalidation strategy would you use and why?,yes
+2,Explain API design.,I made endpoints.,How did you handle authentication and error responses?,yes
+3,Explain database indexing.,I used Python.,What frontend library did you use?,no
